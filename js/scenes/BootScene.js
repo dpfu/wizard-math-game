@@ -38,7 +38,7 @@ export default class BootScene extends Phaser.Scene {
         this.load.image('heart-filled', 'assets/sprites/heart-filled.png'); // Heart fill
 
         // --- NEW: EXP and Spell Assets ---
-        this.load.image('exp_droplet', 'assets/sprites/exp_droplet.png');
+        // this.load.image('exp_droplet', 'assets/sprites/exp_droplet.png'); // REMOVED
         // this.load.image('fireball', 'assets/sprites/fireball.png'); // REMOVED
         // --- END NEW ---
 

@@ -127,10 +127,16 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
             this.freezeTimer = null;
         }
 
-        // Spawn EXP Droplet via GameScene
-        if (this.scene && typeof this.scene.spawnExpDroplet === 'function') {
-            // Spawn near center
-            this.scene.spawnExpDroplet(this.x, this.y - this.height / 2);
+        // --- NEW: Grant EXP directly via GameScene ---
+        if (this.scene && typeof this.scene.gainExp === 'function') {
+            // Grant EXP based on enemy type (adjust values as needed)
+            let expValue = 1; // Default value
+            if (this.constructor.name === 'Plant') {
+                expValue = 2; // Plants are tougher
+            } else if (this.constructor.name === 'Shadow') {
+                expValue = 1; // Shadows are faster but same HP as Ghost
+            }
+            this.scene.gainExp(expValue);
         }
         // --- END NEW ---
 

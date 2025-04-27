@@ -2,8 +2,8 @@
 import Shadow from '../sprites/Shadow.js';
 import Ghost from '../sprites/Ghost.js';
 import Plant from '../sprites/Plant.js';
-// Import EXP Droplet
-import ExpDroplet from '../sprites/ExpDroplet.js';
+// Import EXP Droplet REMOVED
+// import ExpDroplet from '../sprites/ExpDroplet.js';
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
@@ -80,7 +80,7 @@ export default class GameScene extends Phaser.Scene {
         this.pauseKey = null; // Key for manual pause
 
         // --- NEW: Physics Groups ---
-        this.expDroplets = null; // Group for EXP droplets
+        // this.expDroplets = null; // REMOVED
         // this.fireballs = null; // REMOVED
         this.allowedEnemyTypes = []; // Tracks enemies allowed in the current wave
         this.currentTargetEnemy = null; // NEW: The enemy the current question is attached to
@@ -167,10 +167,7 @@ export default class GameScene extends Phaser.Scene {
         });
 
         // --- NEW: Physics Groups ---
-        this.expDroplets = this.physics.add.group({
-            classType: ExpDroplet,
-            runChildUpdate: true // Let droplets manage their own updates
-        });
+        // Droplet group REMOVED
         // Fireball group REMOVED
 
 
@@ -262,7 +259,7 @@ export default class GameScene extends Phaser.Scene {
         console.log(`First wave scheduled in ${initialSpawnDelay / 1000}s`);
 
         // --- NEW: Collisions / Overlaps ---
-        this.physics.add.overlap(this.wizard, this.expDroplets, this.collectExpDroplet, null, this);
+        // Droplet overlap REMOVED
         // Fireball overlap REMOVED
 
         // --- Level Up Screen (create hidden) ---
@@ -961,50 +958,10 @@ export default class GameScene extends Phaser.Scene {
     // --- NEW: EXP and Leveling Methods ---
     // =============================================
 
-    spawnExpDroplet(x, y) {
-        // Get a droplet from the pool or create a new one
-        const droplet = this.expDroplets.get(x, y); // Uses the classType defined in the group
-        if (droplet) {
-            droplet.setActive(true).setVisible(true);
-            droplet.setPosition(x, y); // Ensure position is set correctly
-            droplet.body?.reset(x, y); // Reset physics body state if pooling
+    // spawnExpDroplet REMOVED
+    // collectExpDroplet REMOVED
 
-            // Optional: Add a small visual effect on spawn (e.g., scale tween)
-            this.tweens.add({
-                targets: droplet,
-                scale: { from: 0.3, to: 0.6 }, // Adjust scale as needed
-                alpha: { from: 0.5, to: 1.0 },
-                duration: 200,
-                ease: 'Power1'
-            });
-            droplet.moveToPlayer(this.wizard); // Make it fly towards the player
-        } else {
-            console.warn("Could not get ExpDroplet from pool.");
-        }
-    }
-
-    collectExpDroplet(player, droplet) {
-        // Ensure droplet is active before collecting
-        if (!droplet.active) {
-            return;
-        }
-
-        const value = droplet.expValue || 1; // Get value from droplet
-        this.gainExp(value);
-
-        // Play sound (using existing coin sound)
-        this.sound.play('correctSound', { volume: 0.4, detune: 200 }); // Slightly higher pitch?
-
-        // Disable and hide the droplet (pooling)
-        droplet.setActive(false).setVisible(false);
-        // Stop its movement immediately
-        if (droplet.body) {
-            droplet.body.stop();
-            droplet.body.enable = false; // Disable physics body until reused
-        }
-        // Optional: Add a small visual effect on collection (e.g., particle burst at player)
-    }
-
+    // Renamed from gainExp - now called directly when enemy dies
     gainExp(amount) {
         if (this.isGameOver || this.isPausedForLevelUp) return; // Don't gain EXP if paused or game over
 
@@ -1091,8 +1048,8 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
-        // Pause projectiles/droplets movement
-        this.expDroplets.getChildren().forEach(d => d.body?.stop());
+        // Pause projectiles/droplets movement REMOVED
+        // this.expDroplets.getChildren().forEach(d => d.body?.stop());
         // this.fireballs.getChildren().forEach(f => f.body?.stop()); // REMOVED
 
         // Pause player animations
@@ -1118,13 +1075,13 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
-         // Resume projectiles/droplets movement
-         this.expDroplets.getChildren().forEach(droplet => {
-             if (droplet.active) {
-                 // Restart movement towards player if it hasn't reached yet
-                 this.physics.moveToObject(droplet, this.wizard, droplet.moveSpeed);
-             }
-         });
+         // Resume projectiles/droplets movement REMOVED
+         // this.expDroplets.getChildren().forEach(droplet => {
+         //     if (droplet.active) {
+         //         // Restart movement towards player if it hasn't reached yet
+         //         this.physics.moveToObject(droplet, this.wizard, droplet.moveSpeed);
+         //     }
+         // });
          // Fireball resume logic REMOVED
 
          // Resume player animation
@@ -1375,7 +1332,7 @@ export default class GameScene extends Phaser.Scene {
         // Pause animations/movement for player and enemies
         this.wizard.anims?.pause();
         this.enemies.getChildren().forEach(enemy => enemy.pause()); // Use existing pause method
-        this.expDroplets.getChildren().forEach(d => d.body?.stop());
+        // Droplet pause logic REMOVED
         // this.fireballs.getChildren().forEach(f => f.body?.stop()); // REMOVED
 
         // Optional: Lower music volume
@@ -1406,10 +1363,7 @@ export default class GameScene extends Phaser.Scene {
         // Resume animations/movement
         this.wizard.anims?.resume();
         this.enemies.getChildren().forEach(enemy => enemy.resume()); // Use existing resume method
-        // Restart movement for droplets
-        this.expDroplets.getChildren().forEach(droplet => {
-             if (droplet.active) this.physics.moveToObject(droplet, this.wizard, droplet.moveSpeed);
-         });
+        // Restart movement for droplets REMOVED
          // Fireball resume logic REMOVED
 
         // Optional: Restore music volume
