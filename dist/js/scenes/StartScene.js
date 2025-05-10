@@ -19,7 +19,7 @@ export default class StartScene extends Phaser.Scene {
         // --- Interaction ---
         // Make the entire screen clickable to start the game
         this.input.on('pointerdown', () => {
-            console.log('Starting GameScene...');
+            console.log('Starting DifficultySelectScene...');
             // Optional: Add a fade out effect
             this.cameras.main.fadeOut(500, 0, 0, 0, (camera, progress) => {
                 if (progress === 1) {

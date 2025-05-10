@@ -4,7 +4,7 @@ export default class Shadow extends Enemy {
     constructor(scene, x, y, difficulty) { // difficulty Parameter wird beibehalten, falls für HP etc. benötigt
         const config = {
             hitPoints: 1,
-            moveSpeed: 80, // Basisgeschwindigkeit, wird in GameScene basierend auf globaler difficulty angepasst
+            moveSpeed: 40, // Basisgeschwindigkeit, wird in GameScene basierend auf globaler difficulty angepasst
             isLoner: true, // Does not spawn in groups easily
             animationKey: 'shadow_idle',
             scale: 2.0
