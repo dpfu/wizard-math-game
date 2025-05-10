@@ -1520,7 +1520,7 @@ export default class GameScene extends Phaser.Scene {
         }
         
         // Update music
-        if (this.currentMusic) {
+        if (this.currentMusic && typeof this.currentMusic.stop === 'function') {
             this.currentMusic.stop();
         }
         this.currentMusic = this.sound.play(chapterConfig.musicKey, { loop: true, volume: 0.4 });
