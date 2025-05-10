@@ -85,6 +85,54 @@ export default class GameScene extends Phaser.Scene {
         // this.fireballs = null; // REMOVED
         this.allowedEnemyTypes = []; // Tracks enemies allowed in the current wave
         this.currentTargetEnemy = null; // NEW: The enemy the current question is attached to
+
+        // --- Chapter System ---
+        this.chapters = [
+            {
+                chapterNumber: 1,
+                backgroundKey: 'background_dim',
+                musicKey: 'gameMusic', // Dark_Forest.mp3
+                enemiesToDefeat: 15,
+                allowedEnemyTypes: [Ghost], // Start simple
+                loreText: "Die dunkle Kammer ist gesäubert.\nIn der alten Bibliothek wartet\nneues Wissen!",
+                allowEasyMultiplication: true
+            },
+            {
+                chapterNumber: 2,
+                backgroundKey: 'background_library',
+                musicKey: 'homeMusic',
+                enemiesToDefeat: 15,
+                allowedEnemyTypes: [Ghost, Shadow],
+                loreText: "Die Bücherflüche sind gebrochen.\nJetzt erwartet dich die\ngroße Halle!",
+                allowEasyMultiplication: false
+            },
+            {
+                chapterNumber: 3,
+                backgroundKey: 'background_hall',
+                musicKey: 'righteousSwordMusic',
+                enemiesToDefeat: 15,
+                allowedEnemyTypes: [Ghost, Shadow, Plant],
+                loreText: "Die Hallen sind sicher!\nDraußen auf dem Feld lauert\nneue Gefahr.",
+                allowEasyMultiplication: false
+            },
+            {
+                chapterNumber: 4,
+                backgroundKey: 'background_field',
+                musicKey: 'jumpMusic',
+                enemiesToDefeat: 15,
+                allowedEnemyTypes: [Shadow, Plant], // More challenging mix
+                loreText: "Das Feld ist ruhig.\nDoch dunkle Kräfte regen sich\nim Wald...",
+                allowEasyMultiplication: false
+            }
+        ];
+        this.currentChapterIndex = 0;
+        this.enemiesDefeatedThisChapter = 0;
+        this.chapterCompleteContainer = null;
+        this.loreScreenContainer = null;
+        this.backgroundSprite = null; // To hold the changeable background
+        this.currentMusic = null; // To hold the current playing music instance
+        this.isChapterTransitioning = false; // Flag for chapter transitions
+        this.allowEasyMultiplication = true; // Will be set by chapter
     }
 
     // Initialize scene with data passed from the previous scene
@@ -107,13 +155,18 @@ export default class GameScene extends Phaser.Scene {
         this.isPausedForLevelUp = false;
         this.isPaused = false; // Reset manual pause state on init
         this.score = 0;
-        this.waveNumber = 0;
+        // this.waveNumber = 0; // Wave number might be less relevant or reset per chapter
         this.sessionStats = [];
         // Reset spell levels and cooldowns if restarting
         // Fireball REMOVED
         this.spells.ice.level = 0;
         this.spells.ice.lastCast = 0;
         this.spells.ice.duration = 3000; // Reset duration to new base
+
+        // --- Chapter Reset ---
+        this.currentChapterIndex = 0;
+        this.enemiesDefeatedThisChapter = 0;
+        this.isChapterTransitioning = false;
         // Reset health etc. will happen in create()
     }
 
@@ -124,10 +177,12 @@ export default class GameScene extends Phaser.Scene {
         this.invulnerable = false;
         this.currentHearts = this.maxHearts;
         this.isPausedForLevelUp = false; // Ensure reset here too
+        this.isChapterTransitioning = false; // Reset flag
 
         // --- World Setup ---
-        // Background
-        this.add.image(this.cameras.main.width / 2, this.cameras.main.height / 2, 'gameBackground').setOrigin(0.5);
+        // Background - will be set by startChapter
+        this.backgroundSprite = this.add.image(this.cameras.main.width / 2, this.cameras.main.height / 2, 'gameBackground').setOrigin(0.5);
+
 
         // Optional: Add a visual line for Game Over (debugging)
         // this.add.line(0, 0, this.gameOverLineX, 0, this.gameOverLineX, this.cameras.main.height, 0xff0000, 0.5).setOrigin(0);
@@ -266,6 +321,8 @@ export default class GameScene extends Phaser.Scene {
 
         // --- Level Up Screen (create hidden) ---
         this.createLevelUpScreen();
+        this.createChapterCompleteScreen(); // Create new screen
+        this.createLoreScreen(); // Create new screen
 
         // --- NEW: Pause Text (create hidden) ---
         this.pauseText = this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2, 'PAUSED', {
@@ -275,10 +332,9 @@ export default class GameScene extends Phaser.Scene {
         // Fade in the scene
         this.cameras.main.fadeIn(500, 0, 0, 0);
 
-         // Start background music for the game scene
-         if (!this.sound.get('gameMusic')?.isPlaying) {
-            this.sound.play('gameMusic', { loop: true, volume: 0.4 }); // Adjust volume as needed
-         }
+        // Start the first chapter
+        this.startChapter(this.currentChapterIndex);
+
 
          // --- Enable Physics Body for Droplets on Reuse ---
          // Ensure the physics body is enabled when a droplet is reused from the pool
@@ -298,15 +354,15 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // --- Handle Manual Pause Input ---
-        // Allow pausing only if not already paused for level up
-        if (Phaser.Input.Keyboard.JustDown(this.pauseKey) && !this.isPausedForLevelUp) {
+        // Allow pausing only if not already paused for level up or chapter transition
+        if (Phaser.Input.Keyboard.JustDown(this.pauseKey) && !this.isPausedForLevelUp && !this.isChapterTransitioning) {
             this.togglePause();
         }
 
         // --- Check for ALL pause states ---
-        if (this.isPaused || this.isPausedForLevelUp) {
+        if (this.isPaused || this.isPausedForLevelUp || this.isChapterTransitioning) {
             // Optional: Could add visual indication of pause like dimming
-            return; // Skip updates if game over or paused for level up / manually
+            return; // Skip updates if game over or paused
         }
 
 
@@ -465,20 +521,24 @@ export default class GameScene extends Phaser.Scene {
 
         const operatorKeys = Object.keys(Operator);
         const randomOperatorKey = operatorKeys[Phaser.Math.Between(0, operatorKeys.length - 1)];
-        const operatorSymbol = Operator[randomOperatorKey];        
-        let num1 = Phaser.Math.Between(1,100);
-        let num2 = Phaser.Math.Between(0,99-num1);
-        
+        const operatorSymbol = Operator[randomOperatorKey];
+        let num1, num2;
+
         switch (operatorSymbol) {
             case Operator.MULTIPLY:
                 num1 = Phaser.Math.RND.pick(this.selectedTables);
-                num2 = Phaser.Math.Between(1,10);
+                do {
+                    num2 = Phaser.Math.Between(1, 10);
+                } while (!this.allowEasyMultiplication && (num1 === 1 || num2 === 1) && this.selectedTables.length > 1); // Ensure not 1xY or Xx1 if not allowed and more than just table of 1 selected
+
                 this.currentQuestion.num1 = num1;
                 this.currentQuestion.num2 = num2;
-                this.currentQuestion.operator = operatorSymbol;                 
+                this.currentQuestion.operator = operatorSymbol;
                 this.currentQuestion.answer = this.currentQuestion.num1 * this.currentQuestion.num2;
                 break;
             case Operator.ADD:
+                num1 = Phaser.Math.Between(1,100); // Keep original logic for ADD/SUBTRACT
+                num2 = Phaser.Math.Between(0,99-num1);
                 this.currentQuestion.num1 = num1;
                 this.currentQuestion.num2 = num2;
                 this.currentQuestion.operator = operatorSymbol;                 
@@ -578,24 +638,24 @@ export default class GameScene extends Phaser.Scene {
                 console.log(`Target ${targetEnemy.constructor.name} defeated by attack.`);
                 this.sound.play('enemyHitSound', { delay: 0.15 }); // Play death sound
 
-                // --- Use Built-in Effects for Death ---
-                // this.cameras.main.flash(150, 255, 255, 255);
-
-                // 2. Enemy Death Tween (Scale up/Fade out - handled in Enemy.die() or here)
-                // The takeDamage method already handles tinting.
-                // The die method currently just destroys. We could add tweens there
-                // or keep the tween logic here if preferred. Let's assume die() handles it.
-
                 // Increase score
                 this.score += 10; // Score for defeating the target
                 this.scoreText.setText('Score: ' + this.score);
 
-                // --- NEW: Clear target and generate next question ---
-                this.currentTargetEnemy = null; // Clear the defeated target
-                this.questionText.setVisible(false); // Hide UI temporarily
-                this.inputText.setVisible(false);
-                // Schedule the next question generation after a short delay
-                this.time.delayedCall(750, this.generateQuestion, [], this); // Delay allows death effects to play
+                // --- Chapter Progress ---
+                this.enemiesDefeatedThisChapter++;
+                console.log(`Enemies defeated this chapter: ${this.enemiesDefeatedThisChapter}/${this.chapters[this.currentChapterIndex].enemiesToDefeat}`);
+
+                if (this.enemiesDefeatedThisChapter >= this.chapters[this.currentChapterIndex].enemiesToDefeat) {
+                    this.completeChapter();
+                } else {
+                    // --- NEW: Clear target and generate next question ---
+                    this.currentTargetEnemy = null; // Clear the defeated target
+                    this.questionText.setVisible(false); // Hide UI temporarily
+                    this.inputText.setVisible(false);
+                    // Schedule the next question generation after a short delay
+                    this.time.delayedCall(750, this.generateQuestion, [], this); // Delay allows death effects to play
+                }
 
             } else {
                 // Target Enemy was hit but survived (e.g., Plant)
@@ -728,10 +788,16 @@ export default class GameScene extends Phaser.Scene {
 
     startNextWave() {
         // --- Check pause state ---
-        if (this.isGameOver || this.isPausedForLevelUp || this.isPaused) return; // Added check for manual pause
+        if (this.isGameOver || this.isPausedForLevelUp || this.isPaused || this.isChapterTransitioning) return;
 
-        this.waveNumber++;
+        // Wave logic might need to be simpler if chapters are short, or just let it run.
+        // For now, keep existing wave logic but ensure allowedEnemyTypes is from chapter.
+        this.waveNumber = (this.waveNumber || 0) + 1; // Ensure waveNumber is initialized
         this.enemiesSpawnedThisWave = 0;
+        
+        // Use allowed enemy types from the current chapter
+        const currentChapterConfig = this.chapters[this.currentChapterIndex];
+        this.allowedEnemyTypes = currentChapterConfig.allowedEnemyTypes;
 
         // --- Define Difficulty Phases ---
         const phase1EndWave = 4;  // Waves 1-4: Ghosts only
@@ -739,34 +805,19 @@ export default class GameScene extends Phaser.Scene {
         // Phase 3 (Waves 10+): All enemies
 
         // --- Set Parameters Based on Phase ---
-        if (this.waveNumber <= phase1EndWave) {
-            // Phase 1: Ghosts Only, Very Easy
-            this.allowedEnemyTypes = [Ghost];
-            this.enemiesPerWave = 1 + Math.floor(this.waveNumber / 2) * this.difficulty; // 1, 1, 2, 2
-            this.timeBetweenWaves = Phaser.Math.Between(13000, 15000) / this.difficulty; // Long breaks (13-15s)
-            this.timeBetweenEnemiesInWave = 1500 / this.difficulty; // Slower spawns within wave
-            console.log(`--- Phase 1 (Wave ${this.waveNumber}) ---`);
+        // The original phase logic based on waveNumber might conflict with chapter-defined enemy types.
+        // For now, let's simplify: use chapter's allowed types and a generic wave progression.
+        // Or, we can make wave parameters also part of chapter config if needed.
+        // For simplicity, let's use a fixed number of enemies per wave and time between waves,
+        // relying on the chapter's total enemiesToDefeat for progression.
 
-        } else if (this.waveNumber <= phase2EndWave) {
-            // Phase 2: Ghosts & Shadows, Introduce Speed
-            this.allowedEnemyTypes = [Ghost, Shadow];
-            // Start at 2, increase slowly
-            this.enemiesPerWave = 2 + Math.floor((this.waveNumber - phase1EndWave) / 2) * this.difficulty; // 2, 2, 3, 3, 4
-            this.timeBetweenWaves = Math.max(this.minTimeBetweenWaves + 2000, 12000 - (this.waveNumber - phase1EndWave) * 400) / this.difficulty; // Decrease faster (12s -> ~10s)
-            this.timeBetweenEnemiesInWave = 1200 / this.difficulty; // Slightly faster spawns
-            console.log(`--- Phase 2 (Wave ${this.waveNumber}) ---`);
+        // Example: Simpler wave parameters, can be adjusted or made chapter-specific
+        this.enemiesPerWave = 2 + Math.floor(this.waveNumber / 3) * this.difficulty;
+        this.enemiesPerWave = Math.min(this.enemiesPerWave, 5); // Cap enemies per wave
+        this.timeBetweenWaves = Math.max(this.minTimeBetweenWaves, (10000 - (this.waveNumber * 200)) / this.difficulty);
+        this.timeBetweenEnemiesInWave = 1000 / this.difficulty;
 
-        } else {
-            // Phase 3: All Enemies, Introduce Toughness
-            this.allowedEnemyTypes = [Ghost, Shadow, Plant];
-            // Start at 3, increase steadily
-            this.enemiesPerWave = 3 + Math.floor((this.waveNumber - phase2EndWave) / 2) * this.difficulty; // 3, 3, 4, 4, 5...
-            this.timeBetweenWaves = Math.max(this.minTimeBetweenWaves, 9000 - (this.waveNumber - phase2EndWave) * 300) / this.difficulty; // Decrease towards min (9s -> 3s)
-            this.timeBetweenEnemiesInWave = 1000 / this.difficulty; // Standard spawn speed
-            console.log(`--- Phase 3 (Wave ${this.waveNumber}) ---`);
-        }
-
-        console.log(`Starting Wave ${this.waveNumber}: Spawning ${this.enemiesPerWave} enemies (${this.allowedEnemyTypes.map(e => e.name).join(', ')}). Next wave in ${this.timeBetweenWaves / 1000}s.`);
+        console.log(`Starting Wave ${this.waveNumber} in Chapter ${currentChapterConfig.chapterNumber}: Spawning ${this.enemiesPerWave} enemies (${this.allowedEnemyTypes.map(e => e.name).join(', ')}). Next wave in ${this.timeBetweenWaves / 1000}s.`);
 
         // Start spawning enemies for the current wave
         this.scheduleNextEnemySpawn(0); // Start spawning the first enemy immediately
@@ -774,15 +825,20 @@ export default class GameScene extends Phaser.Scene {
 
     scheduleNextEnemySpawn(spawnedCount) {
         // --- NEW: Check pause state and completion ---
-         if (this.isGameOver || this.isPausedForLevelUp || spawnedCount >= this.enemiesPerWave) {
+         if (this.isGameOver || this.isPausedForLevelUp || this.isPaused || this.isChapterTransitioning || spawnedCount >= this.enemiesPerWave) {
             // Wave spawning finished or paused, schedule the next wave *only if finished and not paused/over*
-            if (!this.isPausedForLevelUp && !this.isGameOver && spawnedCount >= this.enemiesPerWave) {
+            if (!this.isPausedForLevelUp && !this.isPaused && !this.isChapterTransitioning && !this.isGameOver && spawnedCount >= this.enemiesPerWave) {
                 console.log(`Wave ${this.waveNumber} spawning complete.`);
                 if (this.waveSpawnTimer) this.waveSpawnTimer.remove(false);
-                this.nextWaveTimer = this.time.delayedCall(this.timeBetweenWaves, this.startNextWave, [], this);
-            } else if (this.isPausedForLevelUp) {
-                 console.log(`Wave ${this.waveNumber} spawning paused.`);
-                 // Timer will be resumed in resumeAfterLevelUp if needed
+                // Only schedule next wave if chapter is not yet complete
+                if (this.enemiesDefeatedThisChapter < this.chapters[this.currentChapterIndex].enemiesToDefeat) {
+                    this.nextWaveTimer = this.time.delayedCall(this.timeBetweenWaves, this.startNextWave, [], this);
+                } else {
+                    console.log("Chapter enemy goal reached, not scheduling next wave.");
+                }
+            } else if (this.isPausedForLevelUp || this.isPaused || this.isChapterTransitioning) {
+                 console.log(`Wave ${this.waveNumber} spawning paused due to game state.`);
+                 // Timer will be resumed if needed
             }
             return;
         }
@@ -809,32 +865,16 @@ export default class GameScene extends Phaser.Scene {
     // --- Individual Enemy Spawning ---
 
     chooseEnemyType() {
-        // Choose randomly ONLY from the types allowed in the current wave phase
-        if (!this.allowedEnemyTypes || this.allowedEnemyTypes.length === 0) {
-            console.warn("No allowed enemy types defined for this wave! Defaulting to Ghost.");
+        // Choose randomly ONLY from the types allowed in the current chapter
+        const currentChapterConfig = this.chapters[this.currentChapterIndex];
+        const chapterAllowedTypes = currentChapterConfig.allowedEnemyTypes;
+
+        if (!chapterAllowedTypes || chapterAllowedTypes.length === 0) {
+            console.warn("No allowed enemy types defined for this chapter! Defaulting to Ghost.");
             return Ghost; // Fallback
         }
-
-        // --- Weighted Selection within Allowed Types (Example) ---
-        let chosenType;
-        if (this.allowedEnemyTypes.length === 1) {
-            chosenType = this.allowedEnemyTypes[0]; // Only one choice
-        } else if (this.allowedEnemyTypes.includes(Plant)) {
-            // Phase 3: Ghost (30%), Shadow (40%), Plant (30%)
-            const rand = Phaser.Math.Between(1, 10);
-            if (rand <= 3) chosenType = Ghost;
-            else if (rand <= 7) chosenType = Shadow;
-            else chosenType = Plant;
-        } else {
-            // Phase 2: Ghost (50%), Shadow (50%)
-            chosenType = Phaser.Math.RND.pick(this.allowedEnemyTypes); // Simple random pick for phase 2
-            // Or weighted:
-            // const rand = Phaser.Math.Between(1, 10);
-            // chosenType = (rand <= 5) ? Ghost : Shadow;
-        }
-
-        // console.log("Chosen enemy type:", chosenType.name); // Optional debug log
-        return chosenType;
+        
+        return Phaser.Math.RND.pick(chapterAllowedTypes);
     }
 
     spawnEnemy(EnemyClass) {
@@ -1349,9 +1389,11 @@ export default class GameScene extends Phaser.Scene {
         console.log("Game Paused Manually");
         this.isPaused = true;
         this.pauseText.setVisible(true);
-        // Hide calculation UI
-        this.questionText.setVisible(false);
-        this.inputText.setVisible(false);
+        // Hide calculation UI if not already hidden by another system
+        if (!this.isChapterTransitioning && !this.isPausedForLevelUp) {
+            this.questionText.setVisible(false);
+            this.inputText.setVisible(false);
+        }
 
         // Pause physics
         this.physics.world.pause();
@@ -1380,9 +1422,11 @@ export default class GameScene extends Phaser.Scene {
         console.log("Game Resumed Manually");
         this.isPaused = false;
         this.pauseText.setVisible(false);
-        // Show calculation UI
-        this.questionText.setVisible(true);
-        this.inputText.setVisible(true);
+        // Show calculation UI if appropriate (e.g., not in chapter transition)
+        if (!this.isChapterTransitioning && !this.isPausedForLevelUp && this.currentTargetEnemy && this.currentTargetEnemy.active) {
+            this.questionText.setVisible(true);
+            this.inputText.setVisible(true);
+        }
 
         // Resume physics
         this.physics.world.resume();
@@ -1445,6 +1489,234 @@ export default class GameScene extends Phaser.Scene {
                  }
             }
         }
+    }
+
+    // =============================================
+    // --- Chapter System Methods ---
+    // =============================================
+
+    startChapter(chapterIdx) {
+        if (chapterIdx >= this.chapters.length) {
+            console.log("All chapters completed!");
+            this.triggerVictory(); // Or some other end game sequence
+            return;
+        }
+        this.isChapterTransitioning = false;
+        this.currentChapterIndex = chapterIdx;
+        const chapterConfig = this.chapters[this.currentChapterIndex];
+        console.log(`Starting Chapter ${chapterConfig.chapterNumber}`);
+
+        this.enemiesDefeatedThisChapter = 0;
+        this.allowEasyMultiplication = chapterConfig.allowEasyMultiplication;
+
+        // Update background
+        if (this.backgroundSprite) {
+            this.backgroundSprite.setTexture(chapterConfig.backgroundKey);
+        } else {
+            this.backgroundSprite = this.add.image(this.cameras.main.width / 2, this.cameras.main.height / 2, chapterConfig.backgroundKey).setOrigin(0.5);
+            this.backgroundSprite.setDepth(-1); // Ensure background is behind everything
+        }
+        
+        // Update music
+        if (this.currentMusic) {
+            this.currentMusic.stop();
+        }
+        this.currentMusic = this.sound.play(chapterConfig.musicKey, { loop: true, volume: 0.4 });
+
+        // Clear existing enemies from previous chapter (if any)
+        this.enemies.clear(true, true);
+        this.currentTargetEnemy = null;
+        this.questionText.setVisible(false);
+        this.inputText.setVisible(false);
+
+        // Reset wave number for chapter-based wave progression
+        this.waveNumber = 0; 
+        this.enemiesSpawnedThisWave = 0;
+
+        // Resume game systems if they were paused for transition
+        if (this.physics.world.isPaused) this.physics.world.resume();
+        this.wizard.anims.resume();
+
+
+        // Start enemy spawning for the new chapter
+        // Ensure any old timers are cleared before starting new ones
+        if (this.nextWaveTimer) this.nextWaveTimer.remove(false);
+        if (this.waveSpawnTimer) this.waveSpawnTimer.remove(false);
+        
+        const initialSpawnDelay = this.difficulty > 1 ? 0 : 2000; // Shorter delay for chapter start
+        this.nextWaveTimer = this.time.delayedCall(initialSpawnDelay, this.startNextWave, [], this);
+
+        // Ensure UI is ready for new questions
+        this.generateQuestion(); // Attempt to generate a question if enemies spawn quickly
+    }
+
+    completeChapter() {
+        console.log(`Chapter ${this.chapters[this.currentChapterIndex].chapterNumber} Complete!`);
+        this.isChapterTransitioning = true;
+
+        // Pause game elements
+        this.physics.world.pause();
+        if (this.waveSpawnTimer) this.waveSpawnTimer.paused = true;
+        if (this.nextWaveTimer) this.nextWaveTimer.paused = true;
+        this.enemies.getChildren().forEach(enemy => enemy.pause());
+        this.wizard.anims.pause();
+        this.questionText.setVisible(false);
+        this.inputText.setVisible(false);
+
+        // Stop current music before lore/chapter complete screen
+        if (this.currentMusic) {
+            this.currentMusic.stop();
+        }
+        // Optional: Play a chapter complete jingle
+        // this.sound.play('chapterCompleteSound');
+
+
+        // Show "Chapter Complete" screen
+        this.chapterCompleteContainer.setVisible(true);
+        const chapterText = this.chapterCompleteContainer.getData('chapterText');
+        chapterText.setText(`Chapter ${this.chapters[this.currentChapterIndex].chapterNumber} Complete!`);
+        
+        // Animate it
+        this.chapterCompleteContainer.setScale(0.8).setAlpha(0.5);
+        this.tweens.add({
+            targets: this.chapterCompleteContainer,
+            scale: 1.0,
+            alpha: 1.0,
+            duration: 300,
+            ease: 'Back.easeOut'
+        });
+    }
+
+    proceedToLore() {
+        this.chapterCompleteContainer.setVisible(false);
+        this.showLoreScreen();
+    }
+
+    showLoreScreen() {
+        const chapterConfig = this.chapters[this.currentChapterIndex];
+        if (!chapterConfig.loreText) { // Should not happen if all chapters have lore
+            this.proceedToNextChapter();
+            return;
+        }
+
+        this.loreScreenContainer.setVisible(true);
+        const loreTextDisplay = this.loreScreenContainer.getData('loreTextDisplay');
+        loreTextDisplay.setText(chapterConfig.loreText);
+
+        // Animate it
+        this.loreScreenContainer.setScale(0.8).setAlpha(0.5);
+        this.tweens.add({
+            targets: this.loreScreenContainer,
+            scale: 1.0,
+            alpha: 1.0,
+            duration: 300,
+            ease: 'Back.easeOut'
+        });
+    }
+
+    proceedToNextChapter() {
+        this.loreScreenContainer.setVisible(false);
+        this.currentChapterIndex++;
+        if (this.currentChapterIndex < this.chapters.length) {
+            this.startChapter(this.currentChapterIndex);
+        } else {
+            this.triggerVictory(); // All chapters done
+        }
+    }
+    
+    createChapterCompleteScreen() {
+        this.chapterCompleteContainer = this.add.container(this.cameras.main.width / 2, this.cameras.main.height / 2)
+            .setDepth(25).setVisible(false);
+
+        const bg = this.add.graphics()
+            .fillStyle(0x003366, 0.85) // Dark blue
+            .fillRoundedRect(-200, -100, 400, 200, 15)
+            .lineStyle(3, 0xeeeeff, 1)
+            .strokeRoundedRect(-200, -100, 400, 200, 15);
+
+        const chapterText = this.add.text(0, -50, '', {
+            fontSize: '32px', fill: '#FFD700', fontStyle: 'bold', align: 'center'
+        }).setOrigin(0.5);
+
+        const continueButton = this.add.text(0, 50, 'Continue', {
+            fontSize: '28px', fill: '#fff', backgroundColor: '#0066CC', padding: { x: 20, y: 10 }, fontStyle: 'bold'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        continueButton.on('pointerdown', () => this.proceedToLore());
+        continueButton.on('pointerover', () => continueButton.setStyle({ fill: '#add8e6' }));
+        continueButton.on('pointerout', () => continueButton.setStyle({ fill: '#fff' }));
+
+        this.chapterCompleteContainer.add([bg, chapterText, continueButton]);
+        this.chapterCompleteContainer.setData('chapterText', chapterText);
+    }
+
+    createLoreScreen() {
+        this.loreScreenContainer = this.add.container(this.cameras.main.width / 2, this.cameras.main.height / 2)
+            .setDepth(25).setVisible(false);
+
+        // background_scroll.png is the visual, ensure it's sized appropriately
+        // For simplicity, let's assume the scroll image itself is large enough to contain the text area.
+        // We'll place a semi-transparent text box on top of it if needed, or just text.
+        const scrollBg = this.add.image(0, 0, 'background_scroll').setScale(1); // Adjust scale as needed
+
+        // Text box dimensions relative to the scroll image center
+        const textBgWidth = scrollBg.width * 0.6; // Example: 60% of scroll width
+        const textBgHeight = scrollBg.height * 0.4; // Example: 40% of scroll height
+        
+        // Adding a subtle background for text if scroll itself is too busy
+        // const textBg = this.add.graphics()
+        //     .fillStyle(0x000000, 0.3) // Very subtle dark background for text
+        //     .fillRect(-textBgWidth / 2, -textBgHeight / 2, textBgWidth, textBgHeight);
+
+
+        const loreTextDisplay = this.add.text(0, -20, '', { // Y offset slightly up from center
+            fontSize: '20px', fill: '#3a2d20', // Dark brown text, good for scrolls
+            fontStyle: 'italic',
+            align: 'center',
+            wordWrap: { width: textBgWidth - 20, useAdvancedWrap: true }, // Wrap text
+            lineSpacing: 6
+        }).setOrigin(0.5);
+
+        const nextChapterButton = this.add.text(0, scrollBg.height * 0.5 - 40, 'Next Chapter', { // Position button towards bottom of scroll
+            fontSize: '24px', fill: '#5D4037', backgroundColor: '#A1887F', padding: { x: 15, y: 8 }, fontStyle: 'bold'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        nextChapterButton.on('pointerdown', () => this.proceedToNextChapter());
+        nextChapterButton.on('pointerover', () => nextChapterButton.setStyle({ fill: '#3E2723', backgroundColor: '#BCAAA4' }));
+        nextChapterButton.on('pointerout', () => nextChapterButton.setStyle({ fill: '#5D4037', backgroundColor: '#A1887F' }));
+        
+        this.loreScreenContainer.add([scrollBg, /*textBg,*/ loreTextDisplay, nextChapterButton]);
+        this.loreScreenContainer.setData('loreTextDisplay', loreTextDisplay);
+    }
+
+    triggerVictory() {
+        // Simplified victory screen
+        console.log("Player has won the game!");
+        this.isGameOver = true; // Use gameOver flag to stop updates
+        this.isChapterTransitioning = true; // Prevent other actions
+
+        if (this.currentMusic) this.currentMusic.stop();
+        // Play victory music?
+        // this.sound.play('victoryMusic');
+
+        this.physics.pause();
+        this.enemies.clear(true, true);
+        this.wizard.anims.stop();
+        this.questionText.setVisible(false);
+        this.inputText.setVisible(false);
+
+        const victoryText = this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 - 50, 'Congratulations!\nYou have cleared all chapters!', {
+            fontSize: '36px', fill: '#FFD700', align: 'center', fontStyle: 'bold', stroke: '#000', strokeThickness: 5
+        }).setOrigin(0.5).setDepth(30);
+
+        const menuButton = this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 + 50, 'Back to Menu', {
+            fontSize: '28px', fill: '#fff', backgroundColor: '#007BFF', padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setDepth(30).setInteractive({ useHandCursor: true });
+
+        menuButton.on('pointerdown', () => {
+            this.sound.stopAll();
+            this.scene.start('StartScene');
+        });
     }
 
 

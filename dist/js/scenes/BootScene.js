@@ -18,7 +18,13 @@ export default class BootScene extends Phaser.Scene {
         // Backgrounds
         this.load.image('titleScreen', 'assets/backgrounds/title_screen.png');
         // Make sure you have a placeholder image at this path
-        this.load.image('gameBackground', 'assets/backgrounds/background.png');
+        this.load.image('gameBackground', 'assets/backgrounds/background.png'); // Default/fallback
+        this.load.image('background_dim', 'assets/backgrounds/background_dim.png');
+        this.load.image('background_library', 'assets/backgrounds/background_library.png');
+        this.load.image('background_hall', 'assets/backgrounds/background_hall.png');
+        this.load.image('background_field', 'assets/backgrounds/background_field.png');
+        this.load.image('background_scroll', 'assets/backgrounds/background_scroll.png');
+
 
         // Spritesheets (Ensure paths and frame dimensions are correct)
         this.load.spritesheet('wizard', 'assets/sprites/wizard_spritesheet.png', {
@@ -45,7 +51,11 @@ export default class BootScene extends Phaser.Scene {
         // Placeholder for Sounds (Uncomment and add paths when you have sound files)
         // Music
         this.load.audio('startMusic', 'assets/music/Start.mp3');
-        this.load.audio('gameMusic', 'assets/music/Dark_Forest.mp3');
+        this.load.audio('gameMusic', 'assets/music/Dark_Forest.mp3'); // Chapter 1 Music
+        this.load.audio('homeMusic', 'assets/music/Home.mp3'); // Chapter 2 Music
+        this.load.audio('righteousSwordMusic', 'assets/music/Righteous_Sword.mp3'); // Chapter 3 Music
+        this.load.audio('jumpMusic', 'assets/music/Jump.mp3'); // Chapter 4 Music
+
 
         // Sound Effects
         this.load.audio('castSound', 'assets/sounds/foom.wav');
