@@ -1561,6 +1561,7 @@ export default class GameScene extends Phaser.Scene {
         // Stop current music before lore/chapter complete screen
         if (this.currentMusic && typeof this.currentMusic.stop === 'function') {
             this.currentMusic.stop();
+            this.currentMusic = null; // Explicitly clear the reference
         }
         // Optional: Play a chapter complete jingle
         // this.sound.play('chapterCompleteSound');
