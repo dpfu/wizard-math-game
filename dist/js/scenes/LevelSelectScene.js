@@ -2,10 +2,16 @@ export default class LevelSelectScene extends Phaser.Scene {
     constructor() {
         super('LevelSelectScene');
         this.selectedTables = new Set([3]); // Default to 3 times table selected
-        this.difficulty = 1;
+        this.difficulty = 1; // Standardwert, wird von DifficultySelectScene überschrieben 
         this.tableButtons = {}; // To store references to button text objects
     }
-
+      
+    init(data) { 
+        console.log('LevelSelectScene init, received data:', data);  
+        this.difficulty = data.difficulty !== undefined ? data.difficulty : 1; // Übernehme die Schwierigkeit oder Standardwert
+        console.log('LevelSelectScene difficulty set to:', this.difficulty); 
+    }
+    
     preload() {
         // Preload assets if needed, for now reuse existing ones
         console.log('LevelSelectScene: preload');
@@ -51,35 +57,7 @@ export default class LevelSelectScene extends Phaser.Scene {
         const startX = (this.cameras.main.width - (columns * buttonWidth + (columns - 1) * 20)) / 2 + buttonWidth / 2;
         const startY = 180;
         const spacingX = buttonWidth + 20;
-        const spacingY = buttonHeight + 20;
-
-            
-        // Hard difficulty        
-        const hardDifficultyText = this.add.text(this.cameras.main.width / 2, 400, `Hard`, buttonStyle)
-            .setOrigin(0.5)
-            .setInteractive();            
-
-        // Set initial appearance based on default selection
-        if (this.difficulty == 2) {
-            hardDifficultyText.setStyle(selectedStyle);
-        }
-        
-        hardDifficultyText.on('pointerdown', () => {
-            
-            if (this.difficulty == 1) {
-                this.difficulty = 2;
-                hardDifficultyText.setStyle(selectedStyle);    
-            } else {
-                this.difficulty = 1;
-                hardDifficultyText.setStyle(buttonStyle);      
-            }
-
-        });        
-
-        // Hover effect
-        hardDifficultyText.on('pointerover', () => {
-            hardDifficultyText.setStyle({ ...hardDifficultyText.style.toJSON(), ...hoverStyle }); // Keep background, change text fill
-        });      
+        const spacingY = buttonHeight + 20;   
 
         // Tables
         for (let i = 1; i <= 10; i++) {

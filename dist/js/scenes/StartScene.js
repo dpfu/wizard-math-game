@@ -25,7 +25,8 @@ export default class StartScene extends Phaser.Scene {
                 if (progress === 1) {
                     // Keep music playing for LevelSelectScene, or stop if desired
                     // this.sound.stopAll();
-                    this.scene.start('LevelSelectScene'); // Go to Level Select instead of Game
+                    // this.scene.start('LevelSelectScene'); // Go to Level Select instead of Game
+                    this.scene.start('DifficultySelectScene'); // Gehe zur DifficultySelectScene  
                 }
             });
         });

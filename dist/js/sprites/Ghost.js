@@ -4,7 +4,7 @@ export default class Ghost extends Enemy {
     constructor(scene, x, y, difficulty) {
         const config = {
             hitPoints: 1,
-            moveSpeed: 40 * difficulty, // Slower speed
+            moveSpeed: 40, // Basisgeschwindigkeit, wird in GameScene basierend auf globaler difficulty angepasst     
             isLoner: false, // Can spawn in groups
             animationKey: 'ghost_idle',
             scale: 2.0
