@@ -4,6 +4,7 @@ import Ghost from '../sprites/Ghost.js';
 import Plant from '../sprites/Plant.js';
 // Import EXP Droplet REMOVED
 // import ExpDroplet from '../sprites/ExpDroplet.js';
+import QuestionGenerator from '../utils/QuestionGenerator.js';
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
@@ -527,89 +528,39 @@ export default class GameScene extends Phaser.Scene {
         this.currentTargetEnemy = Phaser.Math.RND.pick(potentialTargets);
         console.log(`New target selected: ${this.currentTargetEnemy.constructor.name} at x: ${this.currentTargetEnemy.x.toFixed(0)}`);
 
-        // --- Question Generation (adapted logic) ---
-        if (this.selectedOperators.length === 0) {
-            console.error("No operators selected! Cannot generate question.");
+        // --- NEW: Use QuestionGenerator ---
+        const chapterConfig = this.chapters[this.currentChapterIndex]; // Get current chapter's config
+        const questionConfig = {
+            difficulty: this.difficulty,
+            selectedOperators: this.selectedOperators,
+            selectedTables: this.selectedTables,
+            allowEasyMultiplication: chapterConfig.allowEasyMultiplication // Use chapter-specific setting
+        };
+
+        const question = QuestionGenerator.generate(questionConfig);
+
+        if (!question) {
+            console.error("Failed to generate question from QuestionGenerator. Hiding UI.");
             this.questionText.setVisible(false);
             this.inputText.setVisible(false);
+            // Potentially try again after a delay or handle error more gracefully
+            this.time.delayedCall(1000, this.generateQuestion, [], this); // Try again after 1s
             return;
         }
 
-        const operatorSymbol = Phaser.Math.RND.pick(this.selectedOperators);
-        let num1, num2, answer;
-
-        switch (operatorSymbol) {
-            case '⋅':
-                if (this.selectedTables.length === 0) { // Should not happen if UI logic is correct
-                    console.warn("Multiplication selected but no tables available. Defaulting to 2x2.");
-                    num1 = 2; num2 = 2;
-                } else {
-                    num1 = Phaser.Math.RND.pick(this.selectedTables);
-                    do {
-                        num2 = Phaser.Math.Between(1, 10);
-                    } while (!this.allowEasyMultiplication && (num1 === 1 || num2 === 1) && this.selectedTables.length > 1);
-                }
-                answer = num1 * num2;
-                break;
-            case ':':
-                let factor1, factor2, dividend;
-                if (this.selectedTables.length === 0) { // Should not happen
-                     console.warn("Division selected but no tables available. Defaulting to 4/2.");
-                     factor1 = 2; factor2 = 2;
-                } else {
-                    factor1 = Phaser.Math.RND.pick(this.selectedTables);
-                    factor2 = Phaser.Math.Between(1, 10); // Ensure factor2 is not 0
-                }
-                dividend = factor1 * factor2;
-
-                // Randomly decide to ask dividend / factor1 or dividend / factor2
-                if (Phaser.Math.Between(0, 1) === 0) {
-                    num1 = dividend;
-                    num2 = factor1; // Divisor
-                    answer = factor2;
-                } else {
-                    num1 = dividend;
-                    num2 = factor2; // Divisor
-                    answer = factor1;
-                }
-                // Ensure divisor is not zero (already handled by factor1/2 from tables/1-10 range)
-                if (num2 === 0) { // Highly unlikely fallback
-                    console.warn("Divisor was zero, re-generating simple division.");
-                    num2 = Phaser.Math.Between(1,10);
-                    answer = Phaser.Math.Between(1,10);
-                    num1 = num2 * answer;
-                }
-                break;
-            case '+':
-                num1 = Phaser.Math.Between(1, 100);
-                num2 = Phaser.Math.Between(0, 99); // Allow num1+num2 to exceed 100 for more variety
-                answer = num1 + num2;
-                break;
-            case '-':
-                num1 = Phaser.Math.Between(1, 100);
-                num2 = Phaser.Math.Between(0, num1); // Ensure result is not negative
-                answer = num1 - num2;
-                break;
-            default:
-                console.error(`Unknown operator: ${operatorSymbol}`);
-                // Fallback to a simple addition
-                num1 = 1; num2 = 1; operatorSymbol = '+'; answer = 2;
-                break;
-        }
-
-        this.currentQuestion.num1 = num1;
-        this.currentQuestion.num2 = num2;
-        this.currentQuestion.operator = operatorSymbol;
-        this.currentQuestion.answer = answer;
+        this.currentQuestion.num1 = question.num1;
+        this.currentQuestion.num2 = question.num2;
+        this.currentQuestion.operator = question.operator;
+        this.currentQuestion.answer = question.answer;
 
         // Display question
-        this.questionText.setText(`${num1} ${operatorSymbol} ${num2} = ?`);
+        this.questionText.setText(`${question.num1} ${question.operator} ${question.num2} = ?`);
         this.questionText.setVisible(true);
         this.inputText.setVisible(true);
         this.updateInputText();
         
         // Debug log
-        console.log(`New question: ${num1} ${operatorSymbol} ${num2} = ${this.currentQuestion.answer}`);
+        console.log(`New question: ${question.num1} ${question.operator} ${question.num2} = ${this.currentQuestion.answer} (Difficulty: ${this.difficulty})`);
 
         // Record start time for this question
         this.questionStartTime = Date.now();
