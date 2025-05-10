@@ -1559,10 +1559,18 @@ export default class GameScene extends Phaser.Scene {
         this.inputText.setVisible(false);
 
         // Stop current music before lore/chapter complete screen
-        if (this.currentMusic && typeof this.currentMusic.stop === 'function') {
+        const chapterMusicKey = this.chapters[this.currentChapterIndex].musicKey;
+        if (chapterMusicKey && this.sound.get(chapterMusicKey)?.isPlaying) {
+            this.sound.stopByKey(chapterMusicKey);
+            console.log(`Music for chapter ${this.currentChapterIndex + 1} (${chapterMusicKey}) stopped via stopByKey.`);
+        } else if (this.currentMusic && typeof this.currentMusic.stop === 'function') {
+            // Fallback or if musicKey was not found but currentMusic instance exists
             this.currentMusic.stop();
-            this.currentMusic = null; // Explicitly clear the reference
+            console.log(`Music for chapter ${this.currentChapterIndex + 1} stopped via this.currentMusic.stop().`);
         }
+        
+        // Ensure the reference is cleared regardless, as it's no longer the "current" music.
+        this.currentMusic = null;
         // Optional: Play a chapter complete jingle
         // this.sound.play('chapterCompleteSound');
 
