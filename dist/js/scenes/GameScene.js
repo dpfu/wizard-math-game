@@ -49,12 +49,13 @@ export default class GameScene extends Phaser.Scene {
         this.timeBetweenEnemiesInWave = 1000; // Time between individual enemy spawns within a wave (ms)
         this.waveSpawnTimer = null; // Timer for spawning enemies within a wave
         this.nextWaveTimer = null; // Timer for scheduling the next wave
+        this.practiceModeSpawnCheckTimer = null; // Spezieller Timer für den Practice Mode     
 
         // this.enemySpeed = 45; // Removed - speed is now per-enemy
         this.gameOverLineX = 150; // X-coordinate where enemies trigger player damage
         this.isGameOver = false;
         this.selectedTables = [3]; // Default value, will be overwritten by init
-        this.difficulty = 1;
+        this.difficulty = 1; // Wird von LevelSelectScene gesetzt (0: Practice, 1: Normal, 2: Hard) 
 
         // Statistics Collection
         this.sessionStats = []; // Array to store stats
@@ -311,10 +312,14 @@ export default class GameScene extends Phaser.Scene {
 
         // --- Start Enemy Wave Spawning ---
         // Start the first wave after an initial delay
-        const initialSpawnDelay = this.difficulty > 1 ? 0 : 3000; // Time before the very first wave starts
-        this.nextWaveTimer = this.time.delayedCall(initialSpawnDelay, this.startNextWave, [], this);
-        console.log(`First wave scheduled in ${initialSpawnDelay / 1000}s`);
-
+        if (this.difficulty === 0) { // Practice Mode
+            this.checkAndSpawnForPracticeMode();
+        } else { // Normal or Hard Mode
+            const initialSpawnDelay = this.difficulty === 2 ? 500 : 2000; // Kürzere Startverzögerung für Hard Mode
+            this.nextWaveTimer = this.time.delayedCall(initialSpawnDelay, this.startNextWave, [], this);
+            console.log(`First wave (Normal/Hard) scheduled in ${initialSpawnDelay / 1000}s`); 
+        }
+        
         // --- NEW: Collisions / Overlaps ---
         // Droplet overlap REMOVED
         // Fireball overlap REMOVED
