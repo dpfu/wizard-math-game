@@ -41,15 +41,8 @@ export default class GameScene extends Phaser.Scene {
         this.currentQuestion = { num1: 0, num2: 0, answer: 0, operator: '' };
         this.score = 0;
         // Wave spawning variables
-        this.waveNumber = 0;
-        this.enemiesPerWave = 2; // Start with 2 enemies
-        this.enemiesSpawnedThisWave = 0;
-        this.timeBetweenWaves = 8000; // Initial time between waves (ms)
-        this.minTimeBetweenWaves = 3000; // Minimum time between waves
-        this.timeBetweenEnemiesInWave = 1000; // Time between individual enemy spawns within a wave (ms)
-        this.waveSpawnTimer = null; // Timer for spawning enemies within a wave
-        this.nextWaveTimer = null; // Timer for scheduling the next wave
-        this.practiceModeSpawnCheckTimer = null; // Spezieller Timer für den Practice Mode     
+        this.waveSpawnTimer = null; // Timer for spawning enemies (Normal/Hard)
+        this.practiceModeSpawnCheckTimer = null; // Spezieller Timer für den Practice Mode
 
         // this.enemySpeed = 45; // Removed - speed is now per-enemy
         this.gameOverLineX = 150; // X-coordinate where enemies trigger player damage
@@ -311,13 +304,13 @@ export default class GameScene extends Phaser.Scene {
         this.updateInputText();
 
         // --- Start Enemy Wave Spawning ---
-        // Start the first wave after an initial delay
         if (this.difficulty === 0) { // Practice Mode
             this.checkAndSpawnForPracticeMode();
         } else { // Normal or Hard Mode
-            const initialSpawnDelay = this.difficulty === 2 ? 500 : 2000; // Kürzere Startverzögerung für Hard Mode
-            this.nextWaveTimer = this.time.delayedCall(initialSpawnDelay, this.startNextWave, [], this);
-            console.log(`First wave (Normal/Hard) scheduled in ${initialSpawnDelay / 1000}s`); 
+            const initialSpawnDelay = this.difficulty === 2 ? 500 : 2000; // Hard mode starts faster
+            if (this.waveSpawnTimer) this.waveSpawnTimer.remove(false);
+            this.waveSpawnTimer = this.time.delayedCall(initialSpawnDelay, this.scheduleNextEnemySpawn, [], this);
+            console.log(`Initial enemy spawn (Normal/Hard) scheduled in ${initialSpawnDelay / 1000}s`);
         }
         
         // --- NEW: Collisions / Overlaps ---
@@ -791,83 +784,61 @@ export default class GameScene extends Phaser.Scene {
     }
 
 
-    // --- Wave Management ---
+    // --- Wave Management & Enemy Spawning (New Difficulty Logic) ---
 
-    startNextWave() {
-        // --- Check pause state ---
-        if (this.isGameOver || this.isPausedForLevelUp || this.isPaused || this.isChapterTransitioning) return;
-
-        // Wave logic might need to be simpler if chapters are short, or just let it run.
-        // For now, keep existing wave logic but ensure allowedEnemyTypes is from chapter.
-        this.waveNumber = (this.waveNumber || 0) + 1; // Ensure waveNumber is initialized
-        this.enemiesSpawnedThisWave = 0;
-        
-        // Use allowed enemy types from the current chapter
-        const currentChapterConfig = this.chapters[this.currentChapterIndex];
-        this.allowedEnemyTypes = currentChapterConfig.allowedEnemyTypes;
-
-        // --- Define Difficulty Phases ---
-        const phase1EndWave = 4;  // Waves 1-4: Ghosts only
-        const phase2EndWave = 9;  // Waves 5-9: Ghosts & Shadows
-        // Phase 3 (Waves 10+): All enemies
-
-        // --- Set Parameters Based on Phase ---
-        // The original phase logic based on waveNumber might conflict with chapter-defined enemy types.
-        // For now, let's simplify: use chapter's allowed types and a generic wave progression.
-        // Or, we can make wave parameters also part of chapter config if needed.
-        // For simplicity, let's use a fixed number of enemies per wave and time between waves,
-        // relying on the chapter's total enemiesToDefeat for progression.
-
-        // Example: Simpler wave parameters, can be adjusted or made chapter-specific
-        this.enemiesPerWave = 2 + Math.floor(this.waveNumber / 3) * this.difficulty;
-        this.enemiesPerWave = Math.min(this.enemiesPerWave, 5); // Cap enemies per wave
-        this.timeBetweenWaves = Math.max(this.minTimeBetweenWaves, (10000 - (this.waveNumber * 200)) / this.difficulty);
-        this.timeBetweenEnemiesInWave = 1000 / this.difficulty;
-
-        console.log(`Starting Wave ${this.waveNumber} in Chapter ${currentChapterConfig.chapterNumber}: Spawning ${this.enemiesPerWave} enemies (${this.allowedEnemyTypes.map(e => e.name).join(', ')}). Next wave in ${this.timeBetweenWaves / 1000}s.`);
-
-        // Start spawning enemies for the current wave
-        this.scheduleNextEnemySpawn(0); // Start spawning the first enemy immediately
-    }
-
-    scheduleNextEnemySpawn(spawnedCount) {
-        // --- NEW: Check pause state and completion ---
-         if (this.isGameOver || this.isPausedForLevelUp || this.isPaused || this.isChapterTransitioning || spawnedCount >= this.enemiesPerWave) {
-            // Wave spawning finished or paused, schedule the next wave *only if finished and not paused/over*
-            if (!this.isPausedForLevelUp && !this.isPaused && !this.isChapterTransitioning && !this.isGameOver && spawnedCount >= this.enemiesPerWave) {
-                console.log(`Wave ${this.waveNumber} spawning complete.`);
-                if (this.waveSpawnTimer) this.waveSpawnTimer.remove(false);
-                // Only schedule next wave if chapter is not yet complete
-                if (this.enemiesDefeatedThisChapter < this.chapters[this.currentChapterIndex].enemiesToDefeat) {
-                    this.nextWaveTimer = this.time.delayedCall(this.timeBetweenWaves, this.startNextWave, [], this);
-                } else {
-                    console.log("Chapter enemy goal reached, not scheduling next wave.");
-                }
-            } else if (this.isPausedForLevelUp || this.isPaused || this.isChapterTransitioning) {
-                 console.log(`Wave ${this.waveNumber} spawning paused due to game state.`);
-                 // Timer will be resumed if needed
-            }
+    checkAndSpawnForPracticeMode() {
+        if (this.isGameOver || this.isPausedForLevelUp || this.isPaused || this.isChapterTransitioning) {
+            if (this.practiceModeSpawnCheckTimer) this.practiceModeSpawnCheckTimer.paused = true;
             return;
         }
+        if (this.practiceModeSpawnCheckTimer) this.practiceModeSpawnCheckTimer.paused = false;
 
-        // Spawn one enemy now
-        const enemyType = this.chooseEnemyType(); // Decide which enemy to spawn
-        const spawnedEnemy = this.spawnEnemy(enemyType); // Spawn it
-
-        let delayForNext = this.timeBetweenEnemiesInWave;
-
-        // If the spawned enemy is a 'loner', increase delay significantly before next spawn in wave
-        if (spawnedEnemy && spawnedEnemy.isLoner) {
-            delayForNext *= 2.5; // Example: Make loners create bigger gaps
-            console.log(`Spawned a loner (${spawnedEnemy.constructor.name}), increasing next spawn delay to ${delayForNext}ms`);
+        if (this.enemies.countActive(true) === 0) {
+            console.log("Practice Mode: Spawning new enemy.");
+            const enemyType = this.chooseEnemyType();
+            this.spawnEnemy(enemyType);
         }
-
-        // Schedule the next spawn in this wave
-        this.waveSpawnTimer = this.time.delayedCall(delayForNext, () => {
-            this.scheduleNextEnemySpawn(spawnedCount + 1);
-        }, [], this);
+        // Schedule the next check
+        if (this.practiceModeSpawnCheckTimer) this.practiceModeSpawnCheckTimer.remove(false);
+        this.practiceModeSpawnCheckTimer = this.time.delayedCall(1000, this.checkAndSpawnForPracticeMode, [], this); // Check every 1 second
     }
 
+    scheduleNextEnemySpawn() {
+        if (this.isGameOver || this.isPausedForLevelUp || this.isPaused || this.isChapterTransitioning) {
+            if (this.waveSpawnTimer) this.waveSpawnTimer.paused = true;
+            return;
+        }
+        if (this.waveSpawnTimer) this.waveSpawnTimer.paused = false;
+        if (this.difficulty === 0) return; // Practice mode uses checkAndSpawnForPracticeMode
+
+        let canSpawn = false;
+        let spawnInterval = 0;
+
+        if (this.difficulty === 1) { // Normal Mode
+            spawnInterval = 3000; // Spawn attempt every 3 seconds
+            if (this.enemies.countActive(true) < 3) {
+                canSpawn = true;
+            } else {
+                // console.log("Normal Mode: Max 3 enemies active, skipping spawn attempt.");
+            }
+        } else if (this.difficulty === 2) { // Hard Mode
+            spawnInterval = 1500; // Spawn attempt every 1.5 seconds
+            canSpawn = true; // Always attempt to spawn
+        } else {
+            console.warn(`scheduleNextEnemySpawn called with unknown difficulty: ${this.difficulty}`);
+            return; // Should not happen
+        }
+
+        if (canSpawn) {
+            console.log(`Difficulty ${this.difficulty}: Attempting to spawn enemy.`);
+            const enemyType = this.chooseEnemyType();
+            this.spawnEnemy(enemyType);
+        }
+
+        // Schedule the next spawn attempt
+        if (this.waveSpawnTimer) this.waveSpawnTimer.remove(false);
+        this.waveSpawnTimer = this.time.delayedCall(spawnInterval, this.scheduleNextEnemySpawn, [], this);
+    }
 
     // --- Individual Enemy Spawning ---
 
@@ -897,13 +868,24 @@ export default class GameScene extends Phaser.Scene {
         const startX = this.cameras.main.width + Phaser.Math.Between(50, 100); // Start varied off-screen right
 
         // Create an instance of the specific enemy class
+        // The 'difficulty' parameter is passed to the enemy constructor,
+        // in case it's used for HP or other non-speed attributes in the future.
         const enemy = new EnemyClass(this, startX, yPos, this.difficulty);
+
+        // Adjust enemy movement speed based on difficulty
+        const speedMap = [30, 45, 70]; // Practice, Normal, Hard (as per design doc)
+        let finalSpeed = speedMap[this.difficulty] !== undefined ? speedMap[this.difficulty] : speedMap[1]; // Default to Normal speed if difficulty is unexpectedly undefined
+
+        // The Enemy base class uses 'moveSpeed' property in its update loop.
+        enemy.moveSpeed = finalSpeed;
+        // The Enemy's originalSpeed is set in its constructor from config.moveSpeed.
+        // We update originalSpeed here as well, as moveSpeed is set directly after creation.
+        enemy.originalSpeed = finalSpeed;
 
         // Add the enemy to the physics group
         this.enemies.add(enemy);
 
-        // Log is now handled inside the Enemy constructor
-        // console.log(`Spawned enemy type ${enemy.constructor.name} at x: ${startX.toFixed(0)}`);
+        console.log(`Spawned ${enemy.constructor.name} with speed ${finalSpeed} (Difficulty: ${this.difficulty})`);
         return enemy; // Return the spawned enemy instance
     }
 
@@ -922,9 +904,9 @@ export default class GameScene extends Phaser.Scene {
             this.waveSpawnTimer.remove(false);
             this.waveSpawnTimer = null;
         }
-        if (this.nextWaveTimer) {
-            this.nextWaveTimer.remove(false);
-            this.nextWaveTimer = null;
+        if (this.practiceModeSpawnCheckTimer) { // Clear practice mode timer
+            this.practiceModeSpawnCheckTimer.remove(false);
+            this.practiceModeSpawnCheckTimer = null;
         }
         // Stop enemy updates and animations
         this.enemies.getChildren().forEach(e => {
@@ -1118,7 +1100,7 @@ export default class GameScene extends Phaser.Scene {
 
         // Pause wave timers explicitly
         if (this.waveSpawnTimer) this.waveSpawnTimer.paused = true;
-        if (this.nextWaveTimer) this.nextWaveTimer.paused = true;
+        if (this.practiceModeSpawnCheckTimer) this.practiceModeSpawnCheckTimer.paused = true;
 
         // Pause individual enemies
         this.enemies.getChildren().forEach(enemy => {
@@ -1145,7 +1127,7 @@ export default class GameScene extends Phaser.Scene {
 
         // Resume wave timers
         if (this.waveSpawnTimer) this.waveSpawnTimer.paused = false;
-        if (this.nextWaveTimer) this.nextWaveTimer.paused = false;
+        if (this.practiceModeSpawnCheckTimer) this.practiceModeSpawnCheckTimer.paused = false;
 
         // Resume individual enemies
         this.enemies.getChildren().forEach(enemy => {
@@ -1407,7 +1389,7 @@ export default class GameScene extends Phaser.Scene {
 
         // Pause timers
         if (this.waveSpawnTimer) this.waveSpawnTimer.paused = true;
-        if (this.nextWaveTimer) this.nextWaveTimer.paused = true;
+        if (this.practiceModeSpawnCheckTimer) this.practiceModeSpawnCheckTimer.paused = true;
         if (this.invulnerableTimer) this.invulnerableTimer.paused = true; // Pause invulnerability timer
 
         // Pause animations/movement for player and enemies
@@ -1440,7 +1422,7 @@ export default class GameScene extends Phaser.Scene {
 
         // Resume timers
         if (this.waveSpawnTimer) this.waveSpawnTimer.paused = false;
-        if (this.nextWaveTimer) this.nextWaveTimer.paused = false;
+        if (this.practiceModeSpawnCheckTimer) this.practiceModeSpawnCheckTimer.paused = false;
         if (this.invulnerableTimer) this.invulnerableTimer.paused = false; // Resume invulnerability timer
 
         // Resume animations/movement
@@ -1514,6 +1496,7 @@ export default class GameScene extends Phaser.Scene {
         console.log(`Starting Chapter ${chapterConfig.chapterNumber}`);
 
         this.enemiesDefeatedThisChapter = 0;
+        this.allowedEnemyTypes = chapterConfig.allowedEnemyTypes; // Ensure allowed types are set for the chapter
         this.allowEasyMultiplication = chapterConfig.allowEasyMultiplication;
 
         // Update background
@@ -1547,11 +1530,16 @@ export default class GameScene extends Phaser.Scene {
 
         // Start enemy spawning for the new chapter
         // Ensure any old timers are cleared before starting new ones
-        if (this.nextWaveTimer) this.nextWaveTimer.remove(false);
         if (this.waveSpawnTimer) this.waveSpawnTimer.remove(false);
+        if (this.practiceModeSpawnCheckTimer) this.practiceModeSpawnCheckTimer.remove(false);
         
-        const initialSpawnDelay = this.difficulty > 1 ? 0 : 2000; // Shorter delay for chapter start
-        this.nextWaveTimer = this.time.delayedCall(initialSpawnDelay, this.startNextWave, [], this);
+        if (this.difficulty === 0) { // Practice Mode
+            this.checkAndSpawnForPracticeMode();
+        } else { // Normal or Hard Mode
+            const initialSpawnDelay = this.difficulty === 2 ? 500 : 1500; // Hard mode starts faster for new chapter
+            this.waveSpawnTimer = this.time.delayedCall(initialSpawnDelay, this.scheduleNextEnemySpawn, [], this);
+            console.log(`Initial enemy spawn for new chapter (Normal/Hard) scheduled in ${initialSpawnDelay / 1000}s`);
+        }
 
         // Ensure UI is ready for new questions
         this.generateQuestion(); // Attempt to generate a question if enemies spawn quickly
@@ -1564,7 +1552,7 @@ export default class GameScene extends Phaser.Scene {
         // Pause game elements
         this.physics.world.pause();
         if (this.waveSpawnTimer) this.waveSpawnTimer.paused = true;
-        if (this.nextWaveTimer) this.nextWaveTimer.paused = true;
+        if (this.practiceModeSpawnCheckTimer) this.practiceModeSpawnCheckTimer.paused = true;
         this.enemies.getChildren().forEach(enemy => enemy.pause());
         this.wizard.anims.pause();
         this.questionText.setVisible(false);
