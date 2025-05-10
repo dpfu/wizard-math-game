@@ -1695,7 +1695,7 @@ export default class GameScene extends Phaser.Scene {
         this.isGameOver = true; // Use gameOver flag to stop updates
         this.isChapterTransitioning = true; // Prevent other actions
 
-        if (this.currentMusic) this.currentMusic.stop();
+        if (this.currentMusic && typeof this.currentMusic.stop === 'function') this.currentMusic.stop();
         // Play victory music?
         // this.sound.play('victoryMusic');
 
