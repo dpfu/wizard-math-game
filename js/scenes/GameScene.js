@@ -336,15 +336,15 @@ export default class GameScene extends Phaser.Scene {
         this.startChapter(this.currentChapterIndex);
 
 
-         // --- Enable Physics Body for Droplets on Reuse ---
+         // --- Enable Physics Body for Droplets on Reuse --- REMOVED as expDroplets group is removed
          // Ensure the physics body is enabled when a droplet is reused from the pool
-         this.expDroplets.createCallback = (droplet) => {
-             droplet.body?.setEnable(true);
-         };
+         // this.expDroplets.createCallback = (droplet) => {
+         //     droplet.body?.setEnable(true);
+         // };
          // Also handle removal (disable body when pooled)
-         this.expDroplets.removeCallback = (droplet) => {
-             droplet.body?.setEnable(false);
-         };
+         // this.expDroplets.removeCallback = (droplet) => {
+         //     droplet.body?.setEnable(false);
+         // };
     }
 
     update(time, delta) {
