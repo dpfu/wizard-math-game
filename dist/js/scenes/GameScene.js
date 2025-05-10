@@ -127,6 +127,7 @@ export default class GameScene extends Phaser.Scene {
         this.currentMusic = null; // To hold the current playing music instance
         this.isChapterTransitioning = false; // Flag for chapter transitions
         this.allowEasyMultiplication = true; // Will be set by chapter
+        this.selectedOperators = ['×']; // Default operator
     }
 
     // Initialize scene with data passed from the previous scene
@@ -136,12 +137,28 @@ export default class GameScene extends Phaser.Scene {
         if (data && data.selectedTables && data.selectedTables.length > 0) {
             this.selectedTables = data.selectedTables;
         } else {
-            console.warn('No valid selectedTables received, defaulting to [3]');
-            this.selectedTables = [3]; // Fallback if no data is passed
+            // If no tables are passed (e.g. only +,- selected), this might be empty.
+            // GameScene logic should handle empty selectedTables if × or ÷ are not among selectedOperators.
+            console.warn('No valid selectedTables received, defaulting to [3] if multiplication/division is used.');
+            this.selectedTables = [3]; // Fallback, primarily for ×/÷ if operators not specified
         }
+
+        if (data && data.selectedOperators && data.selectedOperators.length > 0) {
+            this.selectedOperators = data.selectedOperators;
+        } else {
+            console.warn('No valid selectedOperators received, defaulting to [×]');
+            this.selectedOperators = ['×']; // Fallback
+        }
+        // Ensure selectedTables is empty if × and ÷ are not selected, even if data was passed.
+        // This is a safeguard, LevelSelectScene should already handle this.
+        if (!this.selectedOperators.includes('×') && !this.selectedOperators.includes('÷')) {
+            this.selectedTables = [];
+        }
+
+
         this.difficulty = data.difficulty;
-        console.log('GameScene will use tables:', this.selectedTables);
-        
+        console.log('GameScene will use tables:', this.selectedTables, 'and operators:', this.selectedOperators);
+
         // --- Reset state on init ---
         this.playerLevel = 1;
         this.currentExp = 0;
@@ -510,51 +527,83 @@ export default class GameScene extends Phaser.Scene {
         this.currentTargetEnemy = Phaser.Math.RND.pick(potentialTargets);
         console.log(`New target selected: ${this.currentTargetEnemy.constructor.name} at x: ${this.currentTargetEnemy.x.toFixed(0)}`);
 
-        // --- Question Generation (existing logic) ---
-        const Operator = {
-            MULTIPLY: '×',
-            ADD: '+',
-            SUBTRACT: '−',
-        };
+        // --- Question Generation (adapted logic) ---
+        if (this.selectedOperators.length === 0) {
+            console.error("No operators selected! Cannot generate question.");
+            this.questionText.setVisible(false);
+            this.inputText.setVisible(false);
+            return;
+        }
 
-        const operatorKeys = Object.keys(Operator);
-        const randomOperatorKey = operatorKeys[Phaser.Math.Between(0, operatorKeys.length - 1)];
-        const operatorSymbol = Operator[randomOperatorKey];
-        let num1, num2;
+        const operatorSymbol = Phaser.Math.RND.pick(this.selectedOperators);
+        let num1, num2, answer;
 
         switch (operatorSymbol) {
-            case Operator.MULTIPLY:
-                num1 = Phaser.Math.RND.pick(this.selectedTables);
-                do {
-                    num2 = Phaser.Math.Between(1, 10);
-                } while (!this.allowEasyMultiplication && (num1 === 1 || num2 === 1) && this.selectedTables.length > 1); // Ensure not 1xY or Xx1 if not allowed and more than just table of 1 selected
+            case '×':
+                if (this.selectedTables.length === 0) { // Should not happen if UI logic is correct
+                    console.warn("Multiplication selected but no tables available. Defaulting to 2x2.");
+                    num1 = 2; num2 = 2;
+                } else {
+                    num1 = Phaser.Math.RND.pick(this.selectedTables);
+                    do {
+                        num2 = Phaser.Math.Between(1, 10);
+                    } while (!this.allowEasyMultiplication && (num1 === 1 || num2 === 1) && this.selectedTables.length > 1);
+                }
+                answer = num1 * num2;
+                break;
+            case '÷':
+                let factor1, factor2, dividend;
+                if (this.selectedTables.length === 0) { // Should not happen
+                     console.warn("Division selected but no tables available. Defaulting to 4/2.");
+                     factor1 = 2; factor2 = 2;
+                } else {
+                    factor1 = Phaser.Math.RND.pick(this.selectedTables);
+                    factor2 = Phaser.Math.Between(1, 10); // Ensure factor2 is not 0
+                }
+                dividend = factor1 * factor2;
 
-                this.currentQuestion.num1 = num1;
-                this.currentQuestion.num2 = num2;
-                this.currentQuestion.operator = operatorSymbol;
-                this.currentQuestion.answer = this.currentQuestion.num1 * this.currentQuestion.num2;
+                // Randomly decide to ask dividend / factor1 or dividend / factor2
+                if (Phaser.Math.Between(0, 1) === 0) {
+                    num1 = dividend;
+                    num2 = factor1; // Divisor
+                    answer = factor2;
+                } else {
+                    num1 = dividend;
+                    num2 = factor2; // Divisor
+                    answer = factor1;
+                }
+                // Ensure divisor is not zero (already handled by factor1/2 from tables/1-10 range)
+                if (num2 === 0) { // Highly unlikely fallback
+                    console.warn("Divisor was zero, re-generating simple division.");
+                    num2 = Phaser.Math.Between(1,10);
+                    answer = Phaser.Math.Between(1,10);
+                    num1 = num2 * answer;
+                }
                 break;
-            case Operator.ADD:
-                num1 = Phaser.Math.Between(1,100); // Keep original logic for ADD/SUBTRACT
-                num2 = Phaser.Math.Between(0,99-num1);
-                this.currentQuestion.num1 = num1;
-                this.currentQuestion.num2 = num2;
-                this.currentQuestion.operator = operatorSymbol;                 
-                this.currentQuestion.answer = this.currentQuestion.num1 + this.currentQuestion.num2;
+            case '+':
+                num1 = Phaser.Math.Between(1, 100);
+                num2 = Phaser.Math.Between(0, 99); // Allow num1+num2 to exceed 100 for more variety
+                answer = num1 + num2;
                 break;
-            case Operator.SUBTRACT:
-                // Stelle sicher, dass num1 die größere Zahl ist und das Ergebnis nicht negativ ist
-                num1 = Phaser.Math.Between(1, 100); // Minuend
-                num2 = Phaser.Math.Between(0, num1); // Subtrahend (muss <= num1 sein, kann 0 sein)
-                this.currentQuestion.num1 = num1;
-                this.currentQuestion.num2 = num2;
-                this.currentQuestion.operator = operatorSymbol;
-                this.currentQuestion.answer = this.currentQuestion.num1 - this.currentQuestion.num2;
+            case '-':
+                num1 = Phaser.Math.Between(1, 100);
+                num2 = Phaser.Math.Between(0, num1); // Ensure result is not negative
+                answer = num1 - num2;
+                break;
+            default:
+                console.error(`Unknown operator: ${operatorSymbol}`);
+                // Fallback to a simple addition
+                num1 = 1; num2 = 1; operatorSymbol = '+'; answer = 2;
                 break;
         }
 
+        this.currentQuestion.num1 = num1;
+        this.currentQuestion.num2 = num2;
+        this.currentQuestion.operator = operatorSymbol;
+        this.currentQuestion.answer = answer;
+
         // Display question
-        this.questionText.setText(`${this.currentQuestion.num1} ${operatorSymbol} ${this.currentQuestion.num2} = ?`);
+        this.questionText.setText(`${num1} ${operatorSymbol} ${num2} = ?`);
         this.questionText.setVisible(true);
         this.inputText.setVisible(true);
         this.updateInputText();
