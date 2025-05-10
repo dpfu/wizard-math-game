@@ -86,7 +86,7 @@ export default class GameScene extends Phaser.Scene {
                 chapterNumber: 1,
                 backgroundKey: 'background_dim',
                 musicKey: 'gameMusic', // Dark_Forest.mp3
-                enemiesToDefeat: 15,
+                enemiesToDefeat: 5,
                 allowedEnemyTypes: [Ghost], // Start simple
                 loreText: "Die dunkle Kammer ist gesäubert.\nIn der alten Bibliothek wartet\nneues Wissen!",
                 allowEasyMultiplication: true
@@ -95,7 +95,7 @@ export default class GameScene extends Phaser.Scene {
                 chapterNumber: 2,
                 backgroundKey: 'background_library',
                 musicKey: 'homeMusic',
-                enemiesToDefeat: 15,
+                enemiesToDefeat: 5,
                 allowedEnemyTypes: [Ghost, Shadow],
                 loreText: "Die Bücherflüche sind gebrochen.\nJetzt erwartet dich die\ngroße Halle!",
                 allowEasyMultiplication: false
@@ -104,7 +104,7 @@ export default class GameScene extends Phaser.Scene {
                 chapterNumber: 3,
                 backgroundKey: 'background_hall',
                 musicKey: 'righteousSwordMusic',
-                enemiesToDefeat: 15,
+                enemiesToDefeat: 5,
                 allowedEnemyTypes: [Ghost, Shadow, Plant],
                 loreText: "Die Hallen sind sicher!\nDraußen auf dem Feld lauert\nneue Gefahr.",
                 allowEasyMultiplication: false
@@ -113,7 +113,7 @@ export default class GameScene extends Phaser.Scene {
                 chapterNumber: 4,
                 backgroundKey: 'background_field',
                 musicKey: 'jumpMusic',
-                enemiesToDefeat: 15,
+                enemiesToDefeat: 5,
                 allowedEnemyTypes: [Shadow, Plant], // More challenging mix
                 loreText: "Das Feld ist ruhig.\nDoch dunkle Kräfte regen sich\nim Wald...",
                 allowEasyMultiplication: false
