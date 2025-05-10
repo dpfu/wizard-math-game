@@ -545,13 +545,15 @@ export default class GameScene extends Phaser.Scene {
                 this.currentQuestion.answer = this.currentQuestion.num1 + this.currentQuestion.num2;
                 break;
             case Operator.SUBTRACT:
-                console.log(num1 > num2);
-                this.currentQuestion.num1 = num1 > num2 ? num1 : num2;
-                this.currentQuestion.num2 = num1 > num2 ? num2 : num1;
-                this.currentQuestion.operator = operatorSymbol;                 
+                // Stelle sicher, dass num1 die größere Zahl ist und das Ergebnis nicht negativ ist
+                num1 = Phaser.Math.Between(1, 100); // Minuend
+                num2 = Phaser.Math.Between(0, num1); // Subtrahend (muss <= num1 sein, kann 0 sein)
+                this.currentQuestion.num1 = num1;
+                this.currentQuestion.num2 = num2;
+                this.currentQuestion.operator = operatorSymbol;
                 this.currentQuestion.answer = this.currentQuestion.num1 - this.currentQuestion.num2;
                 break;
-        }        
+        }
 
         // Display question
         this.questionText.setText(`${this.currentQuestion.num1} ${operatorSymbol} ${this.currentQuestion.num2} = ?`);
