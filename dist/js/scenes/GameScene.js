@@ -1571,14 +1571,15 @@ export default class GameScene extends Phaser.Scene {
         
         // Ensure the reference is cleared regardless, as it's no longer the "current" music.
         this.currentMusic = null;
-        // Optional: Play a chapter complete jingle
-        // this.sound.play('chapterCompleteSound');
 
 
         // Show "Chapter Complete" screen
         this.chapterCompleteContainer.setVisible(true);
         const chapterText = this.chapterCompleteContainer.getData('chapterText');
         chapterText.setText(`Chapter ${this.chapters[this.currentChapterIndex].chapterNumber} Complete!`);
+        
+        // Tada!
+        playFanfare(this);
         
         // Animate it
         this.chapterCompleteContainer.setScale(0.8).setAlpha(0.5);
