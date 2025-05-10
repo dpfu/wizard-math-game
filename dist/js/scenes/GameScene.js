@@ -7,11 +7,6 @@ import Plant from '../sprites/Plant.js';
 import QuestionGenerator from '../utils/QuestionGenerator.js';
 
 export default class GameScene extends Phaser.Scene {
-import Plant from '../sprites/Plant.js';
-// Import EXP Droplet REMOVED
-// import ExpDroplet from '../sprites/ExpDroplet.js';
-
-export default class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
 
