@@ -5,6 +5,7 @@ import Plant from '../sprites/Plant.js';
 // Import EXP Droplet REMOVED
 // import ExpDroplet from '../sprites/ExpDroplet.js';
 import QuestionGenerator from '../utils/QuestionGenerator.js';
+import { createLightningEffect } from '../utils/EffectsHelper.js';
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
@@ -627,7 +628,7 @@ export default class GameScene extends Phaser.Scene {
             const targetX = bounds.centerX;
             const targetY = bounds.centerY + Phaser.Math.Between(-10, 10); // Add jitter
 
-            this.createLightning(wandX, wandY, targetX, targetY);
+            createLightningEffect(this, wandX, wandY, targetX, targetY);
 
 
             // --- Damage the Target Enemy ---
@@ -697,91 +698,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // --- Visual Effects ---
-
-    /**
-     * Creates a lightning bolt effect from a start point to an end point.
-     * @param {number} startX - The starting X coordinate.
-     * @param {number} startY - The starting Y coordinate.
-     * @param {number} endX - The ending X coordinate (enemy center X).
-     * @param {number} endY - The ending Y coordinate (enemy center Y with jitter).
-     */
-    createLightning(startX, startY, endX, endY) {
-        const segments = 12; // More segments for smoother animation/jitter
-        const jitter = 15;   // Max pixel offset for the zigzag
-        const duration = 75; // Total duration for the lightning animation (ms)
-        const delayBetweenSegments = duration / segments;
-        const glowColor = 0xffff88; // Soft yellow for glow
-        const glowAlpha = 0.25;
-        const glowWidth = 10;
-        const mainColor = 0xFFFF00; // Bright yellow for main bolt
-        const mainAlpha = 1.0;
-        const mainWidth = 3;
-        const impactShakeDuration = 80;
-        const impactShakeIntensity = 0.005;
-        const fadeOutDuration = 100; // How long the bolt stays visible after drawing
-
-        // --- Generate Points ---
-        const points = [];
-        points.push(new Phaser.Math.Vector2(startX, startY)); // Start point
-
-        for (let i = 1; i <= segments; i++) {
-            const t = i / segments;
-            // Base position using linear interpolation
-            let x = Phaser.Math.Linear(startX, endX, t);
-            let y = Phaser.Math.Linear(startY, endY, t);
-            // Add random jitter, except for the very start and end points
-            if (i < segments) {
-                x += Phaser.Math.Between(-jitter, jitter);
-                y += Phaser.Math.Between(-jitter, jitter);
-            }
-            points.push(new Phaser.Math.Vector2(x, y));
-        }
-
-        // --- Create Graphics Objects ---
-        // Glow layer (drawn first, underneath)
-        const glowGraphics = this.add.graphics().setDepth(5); // Ensure glow is behind main bolt if needed
-        glowGraphics.lineStyle(glowWidth, glowColor, glowAlpha);
-
-        // Main lightning bolt layer
-        const lightningGraphics = this.add.graphics().setDepth(6); // Ensure main bolt is on top
-        lightningGraphics.lineStyle(mainWidth, mainColor, mainAlpha);
-
-        // --- Animate Drawing ---
-        let currentSegment = 0;
-        const drawSegment = () => {
-            if (currentSegment >= points.length - 1) {
-                // Animation finished
-                // Play impact sound (reuse castSound or add a dedicated 'zap' sound)
-                this.sound.play('castSound', { volume: 0.6 }); // Consider a unique sound: 'zapSound'
-                // Optional: Camera shake on impact
-                this.cameras.main.shake(impactShakeDuration, impactShakeIntensity);
-
-                // Set a timer to destroy the graphics after a short delay
-                this.time.delayedCall(fadeOutDuration, () => {
-                    glowGraphics.destroy();
-                    lightningGraphics.destroy();
-                });
-                return; // Stop the loop
-            }
-
-            const p1 = points[currentSegment];
-            const p2 = points[currentSegment + 1];
-
-            // Draw segment on both graphics objects
-            glowGraphics.strokeLineShape(new Phaser.Geom.Line(p1.x, p1.y, p2.x, p2.y));
-            lightningGraphics.strokeLineShape(new Phaser.Geom.Line(p1.x, p1.y, p2.x, p2.y));
-
-            currentSegment++;
-        };
-
-        // Use a timed event to call drawSegment repeatedly
-        this.time.addEvent({
-            delay: delayBetweenSegments,
-            callback: drawSegment,
-            callbackScope: this,
-            repeat: segments // Run 'segments' times to draw all lines between the points
-        });
-    }
+    // createLightning wurde nach EffectsHelper.js verschoben
 
 
     // --- Wave Management & Enemy Spawning (New Difficulty Logic) ---
