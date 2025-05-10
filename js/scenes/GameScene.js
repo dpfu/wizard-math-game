@@ -545,13 +545,15 @@ export default class GameScene extends Phaser.Scene {
                 this.currentQuestion.answer = this.currentQuestion.num1 + this.currentQuestion.num2;
                 break;
             case Operator.SUBTRACT:
-                console.log(num1 > num2);
-                this.currentQuestion.num1 = num1 > num2 ? num1 : num2;
-                this.currentQuestion.num2 = num1 > num2 ? num2 : num1;
-                this.currentQuestion.operator = operatorSymbol;                 
+                // Stelle sicher, dass num1 die größere Zahl ist und das Ergebnis nicht negativ ist
+                num1 = Phaser.Math.Between(1, 100); // Minuend
+                num2 = Phaser.Math.Between(0, num1); // Subtrahend (muss <= num1 sein, kann 0 sein)
+                this.currentQuestion.num1 = num1;
+                this.currentQuestion.num2 = num2;
+                this.currentQuestion.operator = operatorSymbol;
                 this.currentQuestion.answer = this.currentQuestion.num1 - this.currentQuestion.num2;
                 break;
-        }        
+        }
 
         // Display question
         this.questionText.setText(`${this.currentQuestion.num1} ${operatorSymbol} ${this.currentQuestion.num2} = ?`);
@@ -1518,7 +1520,7 @@ export default class GameScene extends Phaser.Scene {
         }
         
         // Update music
-        if (this.currentMusic) {
+        if (this.currentMusic && typeof this.currentMusic.stop === 'function') {
             this.currentMusic.stop();
         }
         this.currentMusic = this.sound.play(chapterConfig.musicKey, { loop: true, volume: 0.4 });
@@ -1695,7 +1697,7 @@ export default class GameScene extends Phaser.Scene {
         this.isGameOver = true; // Use gameOver flag to stop updates
         this.isChapterTransitioning = true; // Prevent other actions
 
-        if (this.currentMusic) this.currentMusic.stop();
+        if (this.currentMusic && typeof this.currentMusic.stop === 'function') this.currentMusic.stop();
         // Play victory music?
         // this.sound.play('victoryMusic');
 
