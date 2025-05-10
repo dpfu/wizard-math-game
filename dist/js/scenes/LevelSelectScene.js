@@ -2,11 +2,11 @@ export default class LevelSelectScene extends Phaser.Scene {
     constructor() {
         super('LevelSelectScene');
         this.selectedTables = new Set([3]); // Default to 3 times table selected
-        this.selectedOperators = new Set(['×']); // Default to multiplication
+        this.selectedOperators = new Set(['⋅']); // Default to multiplication
         this.difficulty = 1; // Standardwert, wird von DifficultySelectScene überschrieben
         this.tableButtons = {}; // To store references to table button text objects
         this.operatorButtons = {}; // To store references to operator button text objects
-        this.operatorOrder = ['+', '-', '×', '÷']; // Define order for UI
+        this.operatorOrder = ['+', '-', '⋅', ':']; // Define order for UI
     }
 
     init(data) {
@@ -103,7 +103,7 @@ export default class LevelSelectScene extends Phaser.Scene {
 
 
         // --- Times Table Selection Buttons ---
-        const tableSectionTitle = this.add.text(this.cameras.main.width / 2, 280, 'Select Times Tables (for × and ÷)', {
+        const tableSectionTitle = this.add.text(this.cameras.main.width / 2, 280, 'Select Times Tables (for ⋅ and :)', {
             fontSize: '24px', fill: '#ffffff', fontStyle: 'italic',
         }).setOrigin(0.5);
 
@@ -221,7 +221,7 @@ export default class LevelSelectScene extends Phaser.Scene {
     }
 
     updateTableButtonsState() {
-        const multiplicationOrDivisionSelected = this.selectedOperators.has('×') || this.selectedOperators.has('÷');
+        const multiplicationOrDivisionSelected = this.selectedOperators.has('⋅') || this.selectedOperators.has(':');
         const tableButtonActiveStyle = { fontSize: '32px', fill: '#ffffff', fontStyle: 'bold', backgroundColor: '#4a4a4a', padding: { x: 15, y: 10 }, stroke: '#000000', strokeThickness: 2 };
         const tableButtonSelectedStyle = { ...tableButtonActiveStyle, backgroundColor: '#008000' };
         const tableButtonDisabledStyle = { ...tableButtonActiveStyle, fill: '#888888', backgroundColor: '#333333' };
@@ -258,7 +258,7 @@ export default class LevelSelectScene extends Phaser.Scene {
     }
 
     updateStartButtonState() {
-        let tablesRequired = this.selectedOperators.has('×') || this.selectedOperators.has('÷');
+        let tablesRequired = this.selectedOperators.has('⋅') || this.selectedOperators.has(':');
         let canStart = false;
 
         if (this.selectedOperators.size > 0) {
@@ -278,7 +278,7 @@ export default class LevelSelectScene extends Phaser.Scene {
         } else {
             this.startButton.setAlpha(0.5);
             this.startButton.disableInteractive(); // Make it truly non-interactive
-            this.infoText.setText('Select operator(s). If × or ÷, select table(s).');
+            this.infoText.setText('Select operator(s). If ⋅ or :, select table(s).');
             this.infoText.setVisible(true);
         }
     }

@@ -127,7 +127,7 @@ export default class GameScene extends Phaser.Scene {
         this.currentMusic = null; // To hold the current playing music instance
         this.isChapterTransitioning = false; // Flag for chapter transitions
         this.allowEasyMultiplication = true; // Will be set by chapter
-        this.selectedOperators = ['×']; // Default operator
+        this.selectedOperators = ['⋅']; // Default operator
     }
 
     // Initialize scene with data passed from the previous scene
@@ -146,12 +146,12 @@ export default class GameScene extends Phaser.Scene {
         if (data && data.selectedOperators && data.selectedOperators.length > 0) {
             this.selectedOperators = data.selectedOperators;
         } else {
-            console.warn('No valid selectedOperators received, defaulting to [×]');
-            this.selectedOperators = ['×']; // Fallback
+            console.warn('No valid selectedOperators received, defaulting to [⋅]');
+            this.selectedOperators = ['⋅']; // Fallback
         }
-        // Ensure selectedTables is empty if × and ÷ are not selected, even if data was passed.
+        // Ensure selectedTables is empty if ⋅ and : are not selected, even if data was passed.
         // This is a safeguard, LevelSelectScene should already handle this.
-        if (!this.selectedOperators.includes('×') && !this.selectedOperators.includes('÷')) {
+        if (!this.selectedOperators.includes('⋅') && !this.selectedOperators.includes(':')) {
             this.selectedTables = [];
         }
 
@@ -539,7 +539,7 @@ export default class GameScene extends Phaser.Scene {
         let num1, num2, answer;
 
         switch (operatorSymbol) {
-            case '×':
+            case '⋅':
                 if (this.selectedTables.length === 0) { // Should not happen if UI logic is correct
                     console.warn("Multiplication selected but no tables available. Defaulting to 2x2.");
                     num1 = 2; num2 = 2;
@@ -551,7 +551,7 @@ export default class GameScene extends Phaser.Scene {
                 }
                 answer = num1 * num2;
                 break;
-            case '÷':
+            case ':':
                 let factor1, factor2, dividend;
                 if (this.selectedTables.length === 0) { // Should not happen
                      console.warn("Division selected but no tables available. Defaulting to 4/2.");
@@ -632,7 +632,7 @@ export default class GameScene extends Phaser.Scene {
             correct: isCorrect
         });
 
-        console.log(`Attempt recorded: ${this.currentQuestion.num1}x${this.currentQuestion.num2}, Given: ${playerAnswerStr}, Correct: ${correctAnswer}, Time: ${timeTaken}ms, Result: ${isCorrect}`);
+        console.log(`Attempt recorded: ${this.currentQuestion.num1}${this.currentQuestion.operator}${this.currentQuestion.num2}, Given: ${playerAnswerStr}, Correct: ${correctAnswer}, Time: ${timeTaken}ms, Result: ${isCorrect}`);
 
         // Check if the parsed number is valid and matches the correct answer
         if (isCorrect) {
